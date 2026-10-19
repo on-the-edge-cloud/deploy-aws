@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Deploy AWS | Preview environments",
-  description: "Next.js static deployment on AWS with Terraform and GitHub Actions.",
+  description: "Next.js SSR on AWS with OpenNext, Terraform and GitHub Actions.",
 };
 
 export default function RootLayout({

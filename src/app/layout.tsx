@@ -6,6 +6,7 @@ export const metadata: Metadata = {
   description: "Next.js SSR on AWS with OpenNext, Terraform and GitHub Actions.",
 };
 
+
 export default function RootLayout({
   children,
 }: Readonly<{

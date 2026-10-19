@@ -16,5 +16,6 @@ jobs:
     with:
       config-path: nextjs-app.ts
       command: ${{ github.event.action == 'closed' && 'destroy' || 'deploy' }}
+      platform-ref: feature/split-actions
     secrets:
       AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}

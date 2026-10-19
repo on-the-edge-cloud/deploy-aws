@@ -62,9 +62,9 @@ Los planes de prueba usan AWS simulado, pero empaquetan el build real con el pro
 
 El [workflow de la app](.github/workflows/preview.yml) solo selecciona `deploy` o `destroy` y llama al [workflow reusable](.github/workflows/nextjs-preview.yml). La configuracion tipada [nextjs-app.ts](nextjs-app.ts) declara el slug de la app, su directorio, version de Node y comandos de build/prueba; no contiene Terraform ni detalles de Lambda. Un mini-proyecto TypeScript en `.github/actions/read-config` valida y carga la configuracion. El Terraform permanece en este repositorio de plataforma.
 
-Las [composite actions](.github/actions) separan lectura/validacion de config, instalacion de Node, build OpenNext, despliegue e infraestructura. El slug debe ser unico por app, tener hasta 24 caracteres y usar letras minusculas, numeros e hifenes: se usa para nombrar recursos y workspaces. `deploy-aws` conserva los workspaces `pr-N` ya existentes; otras apps usan `<slug>-pr-N`.
+El reusable workflow muestra como pasos individuales Node, instalacion, lint, tests, OpenNext y cada operacion Terraform, para que los logs sean visibles directamente en GitHub Actions. La unica composite action agrupa la validacion de `nextjs-app.ts`. El slug debe ser unico por app, tener hasta 24 caracteres y usar letras minusculas, numeros e hifenes: se usa para nombrar recursos y workspaces. `deploy-aws` conserva los workspaces `pr-N` ya existentes; otras apps usan `<slug>-pr-N`.
 
-Las referencias `@feature/split-actions` permiten probar esta rama. Antes de que otras apps lo consuman, publica una version estable del repositorio y cambia las referencias del workflow y las composite actions a un tag, por ejemplo `@v1`. Cada app consumidora configura su propio secret `AWS_ROLE_ARN`; la trust policy OIDC de ese rol debe permitir el repositorio consumidor y el evento `pull_request`.
+El input `platform-ref` fija la version del repositorio de plataforma que aporta Terraform y las actions. Usa `feature/split-actions` para probar esta rama; al publicar la plataforma, usa el mismo tag estable en `uses` y `platform-ref`, por ejemplo `@v1` y `platform-ref: v1`. Cada app consumidora configura su propio secret `AWS_ROLE_ARN`; la trust policy OIDC de ese rol debe permitir el repositorio consumidor y el evento `pull_request`.
 
 Ejemplo para una app consumidora:
 
@@ -72,8 +72,8 @@ Ejemplo para una app consumidora:
 name: Preview environment
 
 on:
-	pull_request:
-		types: [opened, synchronize, reopened, closed]
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
 
 permissions:
 	id-token: write
@@ -81,14 +81,15 @@ permissions:
 	pull-requests: write
 
 jobs:
-	preview:
-		if: github.event.pull_request.head.repo.full_name == github.repository
-		uses: on-the-edge-cloud/deploy-aws/.github/workflows/nextjs-preview.yml@v1
-		with:
-			config-path: nextjs-app.ts
-			command: ${{ github.event.action == 'closed' && 'destroy' || 'deploy' }}
-		secrets:
-			AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+  preview:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    uses: on-the-edge-cloud/deploy-aws/.github/workflows/nextjs-preview.yml@v1
+    with:
+      config-path: nextjs-app.ts
+      command: ${{ github.event.action == 'closed' && 'destroy' || 'deploy' }}
+      platform-ref: v1
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
 ```
 
 El reusable workflow omite PRs desde forks, construye y valida la app, aplica Terraform desde el repositorio de plataforma, invalida CloudFront, ejecuta el smoke test configurado y comenta la URL. Al cerrar el PR, destruye el workspace correspondiente sin requerir un build. El checkout y el build ejecutan codigo del PR, asi que limita el despliegue a colaboradores de confianza.

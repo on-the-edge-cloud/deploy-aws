@@ -1,0 +1,65 @@
+name: Build Next.js for AWS
+description: Installs dependencies and runs configured checks and the OpenNext build.
+
+inputs:
+  app-directory:
+    description: Application directory relative to the checkout root.
+    required: true
+  node-version:
+    description: Node.js version.
+    required: true
+  install-command:
+    description: Dependency installation command.
+    required: true
+  lint-command:
+    description: Lint command; set to an empty string to skip.
+    required: true
+  test-command:
+    description: Test command; set to an empty string to skip.
+    required: true
+  build-command:
+    description: Optional separate build command.
+    required: true
+  opennext-build-command:
+    description: OpenNext build command.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - uses: on-the-edge-cloud/deploy-aws/.github/actions/setup-node@feature/split-actions
+      with:
+        app-directory: ${{ inputs.app-directory }}
+        node-version: ${{ inputs.node-version }}
+        install-command: ${{ inputs.install-command }}
+
+    - name: Lint
+      if: inputs.lint-command != ''
+      shell: bash
+      working-directory: ${{ inputs.app-directory }}
+      env:
+        LINT_COMMAND: ${{ inputs.lint-command }}
+      run: bash -euo pipefail -c "$LINT_COMMAND"
+
+    - name: Test
+      if: inputs.test-command != ''
+      shell: bash
+      working-directory: ${{ inputs.app-directory }}
+      env:
+        TEST_COMMAND: ${{ inputs.test-command }}
+      run: bash -euo pipefail -c "$TEST_COMMAND"
+
+    - name: Build Next.js
+      if: inputs.build-command != ''
+      shell: bash
+      working-directory: ${{ inputs.app-directory }}
+      env:
+        BUILD_COMMAND: ${{ inputs.build-command }}
+      run: bash -euo pipefail -c "$BUILD_COMMAND"
+
+    - name: Build with OpenNext
+      shell: bash
+      working-directory: ${{ inputs.app-directory }}
+      env:
+        OPENNEXT_BUILD_COMMAND: ${{ inputs.opennext-build-command }}
+      run: bash -euo pipefail -c "$OPENNEXT_BUILD_COMMAND"

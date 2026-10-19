@@ -20,8 +20,12 @@ provider "aws" {
 module "nextjs" {
   source = "./modules/nextjs"
 
-  name             = "deploy-aws-${local.environment}"
-  build_path       = "${path.root}/../.open-next"
+  name             = "${var.app_slug}-${local.environment}"
+  build_path       = local.opennext_build_path
   deploy_artifacts = var.deploy_artifacts
   force_destroy    = local.is_preview
+}
+
+locals {
+  opennext_build_path = startswith(var.opennext_build_path, "/") ? var.opennext_build_path : "${path.root}/${var.opennext_build_path}"
 }

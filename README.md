@@ -58,9 +58,42 @@ terraform -chdir=infra test
 
 Los planes de prueba usan AWS simulado, pero empaquetan el build real con el proveedor archive; no crean recursos. Tambien comprueban una configuracion de limpieza sin directorio de build. El smoke test verifica SSR, API y cabeceras/cache inicial de ISR; no demuestra el ciclo distribuido completo. En AWS, consulta `/isr/`, repite antes de 60 segundos, vuelve despues del TTL y comprueba que una peticion posterior obtiene una fecha nueva tras la revalidacion asincrona. Revisa CloudWatch y la DLQ si la fecha no cambia. Tambien puedes ejecutar el smoke test contra la URL de CloudFront.
 
-## Entornos De Preview
+## Pipeline Reutilizable
 
-El [workflow](.github/workflows/preview.yml) instala dependencias, valida tipos, construye OpenNext, prueba Terraform, selecciona el workspace `pr-N`, guarda un plan y lo aplica. Terraform carga assets, cache y codigo Lambda. Despues, Actions invalida CloudFront, espera su finalizacion, ejecuta el smoke test y comenta la URL en el PR. Se omiten PRs desde forks; el checkout y el despliegue ejecutan codigo del PR, por lo que solo deben tener acceso colaboradores de confianza.
+El [workflow de la app](.github/workflows/preview.yml) solo selecciona `deploy` o `destroy` y llama al [workflow reusable](.github/workflows/nextjs-preview.yml). La configuracion tipada [nextjs-app.ts](nextjs-app.ts) declara el slug de la app, su directorio, version de Node y comandos de build/prueba; no contiene Terraform ni detalles de Lambda. Un mini-proyecto TypeScript en `.github/actions/read-config` valida y carga la configuracion. El Terraform permanece en este repositorio de plataforma.
+
+Las [composite actions](.github/actions) separan lectura/validacion de config, instalacion de Node, build OpenNext, despliegue e infraestructura. El slug debe ser unico por app, tener hasta 24 caracteres y usar letras minusculas, numeros e hifenes: se usa para nombrar recursos y workspaces. `deploy-aws` conserva los workspaces `pr-N` ya existentes; otras apps usan `<slug>-pr-N`.
+
+Las referencias `@feature/split-actions` permiten probar esta rama. Antes de que otras apps lo consuman, publica una version estable del repositorio y cambia las referencias del workflow y las composite actions a un tag, por ejemplo `@v1`. Cada app consumidora configura su propio secret `AWS_ROLE_ARN`; la trust policy OIDC de ese rol debe permitir el repositorio consumidor y el evento `pull_request`.
+
+Ejemplo para una app consumidora:
+
+```yaml
+name: Preview environment
+
+on:
+	pull_request:
+		types: [opened, synchronize, reopened, closed]
+
+permissions:
+	id-token: write
+	contents: read
+	pull-requests: write
+
+jobs:
+	preview:
+		if: github.event.pull_request.head.repo.full_name == github.repository
+		uses: on-the-edge-cloud/deploy-aws/.github/workflows/nextjs-preview.yml@v1
+		with:
+			config-path: nextjs-app.ts
+			command: ${{ github.event.action == 'closed' && 'destroy' || 'deploy' }}
+		secrets:
+			AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+```
+
+El reusable workflow omite PRs desde forks, construye y valida la app, aplica Terraform desde el repositorio de plataforma, invalida CloudFront, ejecuta el smoke test configurado y comenta la URL. Al cerrar el PR, destruye el workspace correspondiente sin requerir un build. El checkout y el build ejecutan codigo del PR, asi que limita el despliegue a colaboradores de confianza.
+
+Los comandos de `nextjs-app.ts` son ejecutables. Configura solo repositorios confiables y deja vacios `test-command` o `build-command` si la app no los necesita. OpenNext ya ejecuta `next build`; para esta app, `build-command` queda vacio y se usa `opennext-build-command`.
 
 El cierre no requiere Node.js ni un build. Los buckets de preview usan `force_destroy`, por lo que Terraform elimina tambien los objetos de cache creados durante la ejecucion. Produccion no permite vaciar el bucket automaticamente.
 
@@ -97,7 +130,7 @@ El rol necesita lectura/gestion/borrado de los recursos de preview en estos serv
 - DynamoDB: tabla e indices de cache; SQS: colas, atributos, etiquetas y borrado.
 - CloudFront: distribucion, OAC, funcion de host, cache policies e invalidaciones; lectura de policies administradas.
 - CloudWatch Logs: grupos, retencion, etiquetas y borrado.
-- IAM: crear/leer/eliminar roles, gestionar sus inline policies y etiquetas, y `iam:PassRole` limitado a `deploy-aws-pr-*-*` con `iam:PassedToService = lambda.amazonaws.com`.
+- IAM: crear/leer/eliminar roles, listar politicas adjuntas y perfiles de instancia, gestionar inline policies y etiquetas, y `iam:PassRole` limitado a `<app-slug>-pr-*-*` con `iam:PassedToService = lambda.amazonaws.com`.
 - Backend: `s3:ListBucket`, `s3:GetObject`, `s3:PutObject` y permisos de borrado del lock `.tflock` en los prefijos de estado/workspaces.
 
-Limita ARNs y condiciones al prefijo `deploy-aws-pr-*`, cuenta y region cuando el servicio lo permita. Algunas operaciones de creacion/listado requieren `Resource: "*"`; no sustituyas esta revision por permisos administrativos globales. `PowerUserAccess` por si solo no permite gestionar los roles IAM. No hacen falta permisos de Amplify, ACM ni Route 53. El repositorio no modifica automaticamente el rol de despliegue ni su trust policy.
+Limita ARNs y condiciones al prefijo de la app, cuenta y region cuando el servicio lo permita. Algunas operaciones de creacion/listado requieren `Resource: "*"`; no sustituyas esta revision por permisos administrativos globales. `PowerUserAccess` por si solo no permite gestionar los roles IAM. No hacen falta permisos de Amplify, ACM ni Route 53. El repositorio no modifica automaticamente el rol de despliegue ni su trust policy.

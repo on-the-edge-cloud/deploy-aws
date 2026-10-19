@@ -75,3 +75,19 @@ run "without_local_build" {
     error_message = "Cleanup must retain resource addresses and permit removal of runtime cache objects."
   }
 }
+
+run "application_slug_isolation" {
+  command = plan
+
+  variables {
+    app_slug            = "another-app"
+    pr_number           = "123"
+    opennext_build_path = "/nonexistent/opennext-build"
+    deploy_artifacts    = false
+  }
+
+  assert {
+    condition     = module.nextjs.s3_bucket_name == "another-app-pr-123-123456789012-eu-north-1"
+    error_message = "The app slug must isolate preview buckets across consuming repositories."
+  }
+}

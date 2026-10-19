@@ -1,0 +1,105 @@
+name: Next.js preview platform
+
+on:
+  workflow_call:
+    inputs:
+      config-path:
+        description: Path to nextjs-app.ts in the application repository.
+        required: true
+        type: string
+      command:
+        description: Preview operation, either deploy or destroy.
+        required: true
+        type: string
+    secrets:
+      AWS_ROLE_ARN:
+        description: AWS role assumed through GitHub OIDC.
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: write
+
+concurrency:
+  group: preview-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  preview:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read application configuration
+        id: config
+        uses: on-the-edge-cloud/deploy-aws/.github/actions/read-config@feature/split-actions
+        with:
+          config-path: ${{ inputs.config-path }}
+          command: ${{ inputs.command }}
+
+      - name: Build Next.js and OpenNext
+        if: inputs.command == 'deploy'
+        uses: on-the-edge-cloud/deploy-aws/.github/actions/build-nextjs@feature/split-actions
+        with:
+          app-directory: ${{ steps.config.outputs.app-directory }}
+          node-version: ${{ steps.config.outputs.node-version }}
+          install-command: ${{ steps.config.outputs.install-command }}
+          lint-command: ${{ steps.config.outputs.lint-command }}
+          test-command: ${{ steps.config.outputs.test-command }}
+          build-command: ${{ steps.config.outputs.build-command }}
+          opennext-build-command: ${{ steps.config.outputs.opennext-build-command }}
+
+      - name: Deploy preview
+        id: deploy
+        if: inputs.command == 'deploy'
+        uses: on-the-edge-cloud/deploy-aws/.github/actions/deploy-preview@feature/split-actions
+        with:
+          app-directory: ${{ steps.config.outputs.app-directory }}
+          app-slug: ${{ steps.config.outputs.app-slug }}
+          pr-number: ${{ github.event.pull_request.number }}
+          aws-region: ${{ steps.config.outputs.aws-region }}
+          aws-role-arn: ${{ secrets.AWS_ROLE_ARN }}
+
+      - name: Smoke test preview
+        if: inputs.command == 'deploy' && steps.config.outputs.smoke-test-command != ''
+        shell: bash
+        working-directory: ${{ steps.config.outputs.app-directory }}
+        env:
+          PREVIEW_URL: ${{ steps.deploy.outputs.preview-url }}
+          SMOKE_TEST_COMMAND: ${{ steps.config.outputs.smoke-test-command }}
+        run: bash -euo pipefail -c "$SMOKE_TEST_COMMAND"
+
+      - name: Comment preview URL
+        if: inputs.command == 'deploy'
+        uses: actions/github-script@v7
+        env:
+          PREVIEW_URL: ${{ steps.deploy.outputs.preview-url }}
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const body = `Preview listo: ${process.env.PREVIEW_URL}`;
+            const comments = await github.rest.issues.listComments({ owner, repo, issue_number });
+            const existing = comments.data.find(comment =>
+              comment.user.type === 'Bot' && comment.body.startsWith('Preview listo: https://')
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
+
+      - name: Destroy preview
+        if: inputs.command == 'destroy'
+        uses: on-the-edge-cloud/deploy-aws/.github/actions/destroy-preview@feature/split-actions
+        with:
+          app-directory: ${{ steps.config.outputs.app-directory }}
+          app-slug: ${{ steps.config.outputs.app-slug }}
+          pr-number: ${{ github.event.pull_request.number }}
+          aws-region: ${{ steps.config.outputs.aws-region }}
+          aws-role-arn: ${{ secrets.AWS_ROLE_ARN }}

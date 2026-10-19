@@ -30,6 +30,25 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Debug OIDC subject
+        id: oidc
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const token = await core.getIDToken('sts.amazonaws.com');
+            const payload = JSON.parse(
+              Buffer.from(
+                token.split('.')[1],
+                'base64url'
+              ).toString('utf8')
+            );
+
+            core.setOutput('subject', payload.sub);
+            console.log(`OIDC subject: ${payload.sub}`);
+
+      - name: Show subject
+        run: echo "SUB=${{ steps.oidc.outputs.subject }}"
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:

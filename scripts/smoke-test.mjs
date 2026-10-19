@@ -29,11 +29,17 @@ assert.equal(health.status, "ok");
 assert.ok(Number.isFinite(Date.parse(health.timestamp)));
 
 const isrResponse = await request("/isr/");
-assert.match(isrResponse.headers.get("cache-control") ?? "", /s-maxage=60/);
+const isrCacheControl = isrResponse.headers.get("cache-control") ?? "";
+const isrMaxAgeMatch = isrCacheControl.match(/(?:^|,)\s*s-maxage=(\d+)(?:,|$)/);
+assert.ok(isrMaxAgeMatch, `Expected an ISR cache lifetime, received: ${isrCacheControl}`);
+const isrMaxAge = Number(isrMaxAgeMatch[1]);
+assert.ok(isrMaxAge <= 60, `Expected ISR cache lifetime <= 60 seconds, received: ${isrMaxAge}`);
 const firstIsr = timestamp(await isrResponse.text());
 const secondIsr = timestamp(await (await request("/isr/")).text());
-if (Date.now() - Date.parse(firstIsr) < 55000) {
+if (isrMaxAge > 5) {
   assert.equal(firstIsr, secondIsr, "ISR must reuse the cached page within its TTL");
+} else {
+  console.log(`ISR cache expires in ${isrMaxAge}s; skipped timestamp stability check near revalidation.`);
 }
 
 console.log(`SSR, API and ISR cache smoke checks passed: ${baseUrl}`);

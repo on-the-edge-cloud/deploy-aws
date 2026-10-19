@@ -52,6 +52,30 @@ jobs:
           config-path: ${{ inputs.config-path }}
           command: ${{ inputs.command }}
 
+      - name: Report preview context
+        if: inputs.command == 'deploy' || inputs.command == 'destroy'
+        shell: bash
+        env:
+          APP_SLUG: ${{ steps.config.outputs.app-slug }}
+          AWS_REGION: ${{ steps.config.outputs.aws-region }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          COMMAND: ${{ inputs.command }}
+        run: |
+          if [[ "$APP_SLUG" == "deploy-aws" ]]; then
+            workspace="pr-${PR_NUMBER}"
+          else
+            workspace="${APP_SLUG}-pr-${PR_NUMBER}"
+          fi
+          echo "::notice title=Preview workflow::${COMMAND} for ${APP_SLUG}, PR ${PR_NUMBER}, region ${AWS_REGION}, workspace ${workspace}"
+          {
+            echo "### Preview workflow"
+            echo "- Operation: ${COMMAND}"
+            echo "- App: ${APP_SLUG}"
+            echo "- Pull request: #${PR_NUMBER}"
+            echo "- Region: ${AWS_REGION}"
+            echo "- Terraform workspace: \\`${workspace}\\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Setup Node.js
         if: inputs.command == 'deploy'
         uses: actions/setup-node@v4
@@ -98,7 +122,10 @@ jobs:
         working-directory: ${{ steps.config.outputs.app-directory }}
         env:
           OPENNEXT_BUILD_COMMAND: ${{ steps.config.outputs.opennext-build-command }}
-        run: bash -euo pipefail -c "$OPENNEXT_BUILD_COMMAND"
+        run: |
+          echo "::notice title=OpenNext build::Building the app for AWS. This runs the configured command in the application directory."
+          bash -euo pipefail -c "$OPENNEXT_BUILD_COMMAND"
+          echo "::notice title=OpenNext build::Build completed; Terraform will deploy .open-next."
 
       - name: Configure AWS credentials
         if: inputs.command == 'deploy' || inputs.command == 'destroy'
@@ -140,10 +167,13 @@ jobs:
             echo "TF_VAR_opennext_build_path=$app_root/.open-next"
             echo "PREVIEW_WORKSPACE=$workspace"
           } >> "$GITHUB_ENV"
+          echo "::notice title=Terraform configuration::Using $GITHUB_WORKSPACE/.platform/infra and workspace ${workspace}. OpenNext artifacts: $app_root/.open-next"
 
       - name: Format Terraform
         if: inputs.command == 'deploy' || inputs.command == 'destroy'
-        run: terraform -chdir="$TERRAFORM_ROOT" fmt -check -recursive
+        run: |
+          echo "::notice title=Terraform format::Checking platform Terraform files."
+          terraform -chdir="$TERRAFORM_ROOT" fmt -check -recursive
 
       - name: Initialize Terraform without backend
         if: inputs.command == 'deploy' || inputs.command == 'destroy'
@@ -151,7 +181,9 @@ jobs:
 
       - name: Validate Terraform
         if: inputs.command == 'deploy' || inputs.command == 'destroy'
-        run: terraform -chdir="$TERRAFORM_ROOT" validate
+        run: |
+          echo "::notice title=Terraform validation::Checking the platform configuration before accessing the remote state."
+          terraform -chdir="$TERRAFORM_ROOT" validate
 
       - name: Initialize Terraform backend
         if: inputs.command == 'deploy' || inputs.command == 'destroy'
@@ -169,27 +201,43 @@ jobs:
             terraform -chdir="$TERRAFORM_ROOT" workspace select "$PREVIEW_WORKSPACE" \
               || terraform -chdir="$TERRAFORM_ROOT" workspace new "$PREVIEW_WORKSPACE"
             echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Terraform workspace::Selected ${PREVIEW_WORKSPACE} for deployment."
           elif terraform -chdir="$TERRAFORM_ROOT" workspace select "$PREVIEW_WORKSPACE"; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Terraform workspace::Found ${PREVIEW_WORKSPACE}; destroying its preview resources."
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Terraform workspace::${PREVIEW_WORKSPACE} does not exist; nothing to destroy."
           fi
 
       - name: Plan preview
         if: inputs.command == 'deploy'
-        run: terraform -chdir="$TERRAFORM_ROOT" plan -out="$RUNNER_TEMP/preview.tfplan"
+        run: |
+          echo "::notice title=Terraform plan::Planning resource changes for this preview."
+          terraform -chdir="$TERRAFORM_ROOT" plan -out="$RUNNER_TEMP/preview.tfplan"
 
       - name: Deploy preview
         if: inputs.command == 'deploy'
-        run: terraform -chdir="$TERRAFORM_ROOT" apply "$RUNNER_TEMP/preview.tfplan"
+        run: |
+          echo "::notice title=Terraform apply::Applying the saved plan. AWS resources will be created or updated now."
+          terraform -chdir="$TERRAFORM_ROOT" apply "$RUNNER_TEMP/preview.tfplan"
+          echo "::notice title=Terraform apply::Terraform apply completed."
 
       - name: Read preview URL and CloudFront distribution
         id: preview
         if: inputs.command == 'deploy'
         shell: bash
         run: |
-          echo "preview-url=$(terraform -chdir="$TERRAFORM_ROOT" output -raw preview_url)" >> "$GITHUB_OUTPUT"
-          echo "distribution-id=$(terraform -chdir="$TERRAFORM_ROOT" output -raw cloudfront_distribution_id)" >> "$GITHUB_OUTPUT"
+          preview_url=$(terraform -chdir="$TERRAFORM_ROOT" output -raw preview_url)
+          distribution_id=$(terraform -chdir="$TERRAFORM_ROOT" output -raw cloudfront_distribution_id)
+          echo "preview-url=$preview_url" >> "$GITHUB_OUTPUT"
+          echo "distribution-id=$distribution_id" >> "$GITHUB_OUTPUT"
+          echo "::notice title=Preview deployed::Preview URL: ${preview_url}; CloudFront distribution: ${distribution_id}"
+          {
+            echo "### Preview deployed"
+            echo "- URL: ${preview_url}"
+            echo "- CloudFront distribution: \\`${distribution_id}\\`"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Create CloudFront invalidation
         id: invalidation
@@ -203,13 +251,36 @@ jobs:
             --query 'Invalidation.Id' \
             --output text)
           echo "id=$invalidation_id" >> "$GITHUB_OUTPUT"
+          echo "::notice title=CloudFront invalidation::Created invalidation ${invalidation_id}; waiting for global propagation."
 
       - name: Wait for CloudFront invalidation
         if: inputs.command == 'deploy'
         env:
           DISTRIBUTION_ID: ${{ steps.preview.outputs.distribution-id }}
           INVALIDATION_ID: ${{ steps.invalidation.outputs.id }}
-        run: aws cloudfront wait invalidation-completed --distribution-id "$DISTRIBUTION_ID" --id "$INVALIDATION_ID"
+        run: |
+          set -euo pipefail
+          start_time=$SECONDS
+          max_wait_seconds=900
+
+          while true; do
+            status=$(aws cloudfront get-invalidation \
+              --distribution-id "$DISTRIBUTION_ID" \
+              --id "$INVALIDATION_ID" \
+              --query 'Invalidation.Status' \
+              --output text)
+            echo "::notice title=CloudFront invalidation::${INVALIDATION_ID} status: ${status}"
+
+            if [[ "$status" == "Completed" ]]; then
+              break
+            fi
+            if [[ "$status" == "Failed" || $((SECONDS - start_time)) -ge $max_wait_seconds ]]; then
+              echo "CloudFront invalidation ${INVALIDATION_ID} failed or timed out." >&2
+              exit 1
+            fi
+
+            sleep 15
+          done
 
       - name: Smoke test preview
         if: inputs.command == 'deploy' && steps.config.outputs.smoke-test-command != ''
@@ -218,7 +289,10 @@ jobs:
         env:
           PREVIEW_URL: ${{ steps.preview.outputs.preview-url }}
           SMOKE_TEST_COMMAND: ${{ steps.config.outputs.smoke-test-command }}
-        run: bash -euo pipefail -c "$SMOKE_TEST_COMMAND"
+        run: |
+          echo "::notice title=Preview smoke test::Checking SSR, API and ISR at ${PREVIEW_URL}."
+          bash -euo pipefail -c "$SMOKE_TEST_COMMAND"
+          echo "::notice title=Preview smoke test::All configured smoke checks passed."
 
       - name: Comment preview URL
         if: inputs.command == 'deploy'
@@ -230,6 +304,7 @@ jobs:
             const { owner, repo } = context.repo;
             const issue_number = context.issue.number;
             const body = `Preview listo: ${process.env.PREVIEW_URL}`;
+            core.info(`Publishing preview URL ${process.env.PREVIEW_URL} on PR #${issue_number}`);
             const comments = await github.rest.issues.listComments({ owner, repo, issue_number });
             const existing = comments.data.find(comment =>
               comment.user.type === 'Bot' && comment.body.startsWith('Preview listo: https://')
@@ -243,7 +318,10 @@ jobs:
 
       - name: Destroy preview
         if: inputs.command == 'destroy' && steps.workspace.outputs.exists == 'true'
-        run: terraform -chdir="$TERRAFORM_ROOT" destroy -auto-approve -var="deploy_artifacts=false"
+        run: |
+          echo "::notice title=Terraform destroy::Removing all resources in ${PREVIEW_WORKSPACE}."
+          terraform -chdir="$TERRAFORM_ROOT" destroy -auto-approve -var="deploy_artifacts=false"
+          echo "::notice title=Terraform destroy::All preview resources were removed."
 
       - name: Select default workspace
         if: inputs.command == 'destroy' && steps.workspace.outputs.exists == 'true'

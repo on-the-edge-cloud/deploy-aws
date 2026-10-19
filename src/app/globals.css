@@ -1,0 +1,273 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap");
+
+:root {
+  color-scheme: light;
+  --ink: #192925;
+  --muted: #63716b;
+  --paper: #f3f4ed;
+  --line: #d9ded4;
+  --green: #2d6a4f;
+  --lime: #d5ef73;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: var(--paper);
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  color: var(--ink);
+  font-family: "Manrope", sans-serif;
+  background-image: radial-gradient(#b9c4b5 0.7px, transparent 0.7px);
+  background-size: 18px 18px;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 0 7.2vw;
+  background: linear-gradient(90deg, rgb(243 244 237 / 97%) 0%, rgb(243 244 237 / 92%) 54%, rgb(243 244 237 / 58%) 100%);
+}
+
+.topbar {
+  height: 82px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line);
+  animation: appear 500ms ease-out both;
+}
+
+.wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.mark {
+  width: 27px;
+  height: 27px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  color: #f7f9f1;
+  background: var(--green);
+  font-size: 14px;
+}
+
+.wordmark-light {
+  color: var(--green);
+  font-weight: 500;
+}
+
+.topbar-note,
+.eyebrow,
+.step-index,
+.step small,
+.footer {
+  font-family: "DM Mono", monospace;
+}
+
+.topbar-note {
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+.intro {
+  width: min(760px, 100%);
+  margin: auto 0;
+  padding: 76px 0 86px;
+  animation: rise 650ms 100ms ease-out both;
+}
+
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--green);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+}
+
+.pulse,
+.region-dot {
+  width: 7px;
+  height: 7px;
+  display: inline-block;
+  border-radius: 50%;
+  background: #76a64a;
+}
+
+h1 {
+  margin: 27px 0 20px;
+  font-size: clamp(44px, 6vw, 76px);
+  font-weight: 600;
+  line-height: 1.08;
+}
+
+h1 span {
+  color: var(--green);
+}
+
+.lead {
+  max-width: 580px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.8;
+}
+
+.architecture {
+  max-width: 700px;
+  display: flex;
+  align-items: center;
+  margin-top: 56px;
+  padding: 20px 23px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: rgb(255 255 255 / 52%);
+}
+
+.step {
+  min-width: 125px;
+  display: grid;
+  grid-template-columns: 25px 1fr;
+  align-items: center;
+  gap: 4px 9px;
+}
+
+.step-index {
+  grid-row: span 2;
+  color: #78906e;
+  font-size: 11px;
+}
+
+.step strong {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.step small {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.connector {
+  height: 1px;
+  flex: 1;
+  margin: 0 16px;
+  background: #bbc7b6;
+}
+
+.footer {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 9px;
+  letter-spacing: 0.04em;
+}
+
+.footer-separator {
+  margin: 0 6px;
+  color: #a4b09e;
+}
+
+.region-dot {
+  width: 6px;
+  height: 6px;
+  margin-left: 5px;
+}
+
+@keyframes appear {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 600px) {
+  .shell {
+    padding: 0 23px;
+    background: rgb(243 244 237 / 88%);
+  }
+
+  .topbar {
+    height: 70px;
+  }
+
+  .topbar-note {
+    font-size: 8px;
+  }
+
+  .intro {
+    padding: 68px 0;
+  }
+
+  h1 {
+    font-size: 44px;
+  }
+
+  .lead {
+    font-size: 14px;
+  }
+
+  .architecture {
+    align-items: stretch;
+    padding: 17px 14px;
+  }
+
+  .step {
+    min-width: 0;
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .step-index {
+    grid-row: auto;
+  }
+
+  .step strong {
+    font-size: 10px;
+  }
+
+  .step small {
+    font-size: 9px;
+  }
+
+  .connector {
+    margin: 12px 8px 0;
+  }
+
+  .footer {
+    font-size: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+}

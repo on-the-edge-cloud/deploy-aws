@@ -42,14 +42,19 @@ while true; do
   objects=$(jq -c '[((.Versions // []) + (.DeleteMarkers // []))[] | {Key, VersionId}]' <<<"$page")
 
   if [[ $(jq 'length' <<<"$objects") -gt 0 ]]; then
-    jq -n --argjson objects "$objects" '{Objects: $objects, Quiet: true}' >"$delete_request"
+    jq -n --argjson objects "$objects" '{Objects: $objects, Quiet: false}' >"$delete_request"
     response=$(aws s3api delete-objects \
       --bucket "$bucket" \
       --delete "file://${delete_request}" \
       --output json \
       --no-cli-pager)
 
-    errors=$(jq -c '.Errors // []' <<<"$response")
+    if [[ -n "$response" ]]; then
+      errors=$(jq -c 'if type == "object" then (.Errors // []) else error("unexpected S3 delete response") end' <<<"$response")
+    else
+      errors='[]'
+    fi
+
     if [[ "$errors" != "[]" ]]; then
       printf 'S3 returned errors while emptying s3://%s: %s\n' "$bucket" "$errors" >&2
       exit 1

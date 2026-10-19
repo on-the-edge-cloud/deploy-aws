@@ -62,18 +62,17 @@ Los planes de prueba usan AWS simulado, pero empaquetan el build real con el pro
 
 El [workflow](.github/workflows/preview.yml) instala dependencias, valida tipos, construye OpenNext, prueba Terraform, selecciona el workspace `pr-N`, guarda un plan y lo aplica. Terraform carga assets, cache y codigo Lambda. Despues, Actions invalida CloudFront, espera su finalizacion, ejecuta el smoke test y comenta la URL en el PR. Se omiten PRs desde forks; el checkout y el despliegue ejecutan codigo del PR, por lo que solo deben tener acceso colaboradores de confianza.
 
-El cierre no requiere Node.js ni un build. Antes de destruir Terraform, el workflow pagina y elimina todas las versiones y delete markers del bucket del preview. Esto permite limpiar buckets versionados que quedaron de la arquitectura estática anterior, cuyo `force_destroy` era `false`.
+El cierre no requiere Node.js ni un build. Los buckets de preview usan `force_destroy`, por lo que Terraform elimina tambien los objetos de cache creados durante la ejecucion. Produccion no permite vaciar el bucket automaticamente.
 
 ```sh
 terraform -chdir=infra init
 terraform -chdir=infra workspace select pr-123
-bash scripts/empty-versioned-preview-bucket.sh "$(terraform -chdir=infra output -raw s3_bucket_name)" 123
 terraform -chdir=infra destroy -var='pr_number=123' -var='deploy_artifacts=false'
 terraform -chdir=infra workspace select default
 terraform -chdir=infra workspace delete pr-123
 ```
 
-`deploy_artifacts=false` es exclusivamente para destruir: no lo uses en un apply normal porque eliminaria objetos gestionados. Los buckets de preview usan `force_destroy` para borrar tambien cache creada en runtime. Produccion no permite vaciar el bucket automaticamente.
+`deploy_artifacts=false` es exclusivamente para destruir: no lo uses en un apply normal porque eliminaria objetos gestionados.
 
 Para un despliegue manual, construye OpenNext, inicializa el backend y selecciona el workspace antes de planificar:
 
@@ -87,17 +86,13 @@ terraform -chdir=infra output -raw preview_url
 
 Sin `pr_number` los nombres son de produccion. Los workspaces no son limites de seguridad: no mezcles un workspace de preview con variables de produccion. El backend de estado existente no cambia.
 
-## Migracion Desde El Sitio Estatico
-
-Este cambio reemplaza los recursos anteriores: no migra la distribucion existente y la URL sera distinta. Antes de actualizar una preview existente, revisa el plan. El bucket antiguo tenia versionado y no `force_destroy`; debes vaciar **solo ese bucket de preview**, incluidas versiones y delete markers, antes de que Terraform pueda borrarlo. No vacies el bucket de estado remoto. Alternativamente, destruye las previews con la configuracion anterior despues de vaciar sus buckets y vuelve a crearlas con esta configuracion. Coordina los PRs ya abiertos, que pueden seguir usando el workflow antiguo. Para produccion prepara una migracion independiente y evita aplicar un reemplazo sin revisar.
-
 ## Permisos Del Rol De GitHub Actions
 
 `AWS_ROLE_ARN` sigue siendo el ARN del rol OIDC de despliegue, no el de una Lambda. Restringe su trust policy al repositorio y a los eventos previstos (`repo:OWNER/REPO:pull_request` para previews, con audiencia `sts.amazonaws.com`); no uses `pull_request_target` para ejecutar builds no confiables.
 
 El rol necesita lectura/gestion/borrado de los recursos de preview en estos servicios:
 
-- S3: bucket y objetos de la app (incluidos codigo y cache), configuracion de cifrado, public access block y policies. La limpieza de previews requiere `s3:ListBucketVersions` y `s3:DeleteObjectVersion`, ademas de `s3:ListBucket`, `s3:DeleteObject` y permisos de configuracion del bucket.
+- S3: bucket y objetos de la app (incluidos codigo y cache), configuracion de cifrado, public access block y policies.
 - Lambda: funciones, codigo, configuracion, Function URLs, permisos, invocacion del inicializador y event source mappings.
 - DynamoDB: tabla e indices de cache; SQS: colas, atributos, etiquetas y borrado.
 - CloudFront: distribucion, OAC, funcion de host, cache policies e invalidaciones; lectura de policies administradas.

@@ -122,8 +122,6 @@ jobs:
         run: |
           terraform init
           if terraform workspace select "pr-${PR_NUMBER}"; then
-            S3_BUCKET=$(terraform output -raw s3_bucket_name)
-            bash ../scripts/empty-versioned-preview-bucket.sh "$S3_BUCKET" "$PR_NUMBER"
             terraform destroy -auto-approve -var="deploy_artifacts=false"
             terraform workspace select default
             terraform workspace delete "pr-${PR_NUMBER}"

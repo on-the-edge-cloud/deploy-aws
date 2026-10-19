@@ -5,8 +5,10 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "opennext:build": "open-next build",
     "start": "next start",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test:smoke": "node scripts/smoke-test.mjs"
   },
   "dependencies": {
     "next": "^15.5.0",
@@ -14,9 +16,13 @@
     "react-dom": "^19.0.0"
   },
   "overrides": {
-    "postcss": "^8.5.23"
+    "postcss": "^8.5.23",
+    "@node-minify/core": {
+      "glob": "^10.5.0"
+    }
   },
   "devDependencies": {
+    "@opennextjs/aws": "4.1.11",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

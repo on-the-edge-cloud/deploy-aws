@@ -1,11 +1,11 @@
 output "preview_url" {
-  value = "https://${aws_cloudfront_distribution.frontend.domain_name}"
+  value = module.nextjs.url
 }
 
 output "cloudfront_distribution_id" {
-  value = aws_cloudfront_distribution.frontend.id
+  value = module.nextjs.cloudfront_distribution_id
 }
 
 output "s3_bucket_name" {
-  value = aws_s3_bucket.frontend.bucket
+  value = module.nextjs.s3_bucket_name
 }

@@ -13,7 +13,7 @@ export default function Home() {
         <div className="eyebrow"><span className="pulse" /> SISTEMA LISTO</div>
         <h1>Una URL nueva.<br /><span>Con cada pull request.</span></h1>
         <p className="lead">
-          Sitio Next.js estático en S3 y CloudFront. Terraform prepara un entorno
+          Next.js con SSR en Lambda, S3 y CloudFront. Terraform prepara un entorno
           aislado para revisar cada cambio antes de integrarlo.
         </p>
         <div className="architecture" aria-label="Flujo de despliegue">
@@ -21,12 +21,12 @@ export default function Home() {
           <span className="connector" aria-hidden="true" />
           <div className="step"><span className="step-index">02</span><strong>Infraestructura</strong><small>Terraform</small></div>
           <span className="connector" aria-hidden="true" />
-          <div className="step"><span className="step-index">03</span><strong>Preview listo</strong><small>S3 + CloudFront</small></div>
+          <div className="step"><span className="step-index">03</span><strong>Preview listo</strong><small>OpenNext + AWS</small></div>
         </div>
       </section>
 
       <footer className="footer">
-        <span>DEPLOY-AWS <span className="footer-separator">/</span> NEXT.JS STATIC EXPORT</span>
+        <span>DEPLOY-AWS <span className="footer-separator">/</span> NEXT.JS SSR + OPENNEXT</span>
         <span>EU-NORTH-1 <span className="region-dot" /></span>
       </footer>
     </main>

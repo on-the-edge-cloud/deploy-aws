@@ -18,7 +18,14 @@ concurrency:
 
 jobs:
   preview:
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+      TF_VAR_pr_number: ${{ github.event.pull_request.number }}
+      TF_VAR_aws_region: eu-north-1
 
     steps:
       - uses: actions/checkout@v4
@@ -40,11 +47,21 @@ jobs:
         with:
           terraform_version: 1.10.5
 
-      - name: Build Next.js
+      - name: Build Next.js and OpenNext
         if: github.event.action != 'closed'
         run: |
           npm ci
-          npm run build
+          npm run lint
+          npm run opennext:build
+
+      - name: Validate Terraform
+        if: github.event.action != 'closed'
+        working-directory: infra
+        run: |
+          terraform fmt -check -recursive
+          terraform init -backend=false
+          terraform validate
+          terraform test
 
       - name: Deploy preview
         if: github.event.action != 'closed'
@@ -53,24 +70,27 @@ jobs:
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          terraform init
+          terraform init -reconfigure
           terraform workspace select "pr-${PR_NUMBER}" || terraform workspace new "pr-${PR_NUMBER}"
-          terraform apply -auto-approve -var="pr_number=${PR_NUMBER}"
+          terraform plan -out=tfplan
+          terraform apply tfplan
           echo "preview-url=$(terraform output -raw preview_url)" >> "$GITHUB_OUTPUT"
           echo "s3-bucket=$(terraform output -raw s3_bucket_name)" >> "$GITHUB_OUTPUT"
           echo "cloudfront-id=$(terraform output -raw cloudfront_distribution_id)" >> "$GITHUB_OUTPUT"
-
-      - name: Upload static assets
-        if: github.event.action != 'closed'
-        env:
-          S3_BUCKET: ${{ steps.deploy.outputs.s3-bucket }}
-        run: aws s3 sync out/ "s3://${S3_BUCKET}" --delete
 
       - name: Invalidate CloudFront
         if: github.event.action != 'closed'
         env:
           CLOUDFRONT_DISTRIBUTION_ID: ${{ steps.deploy.outputs.cloudfront-id }}
-        run: aws cloudfront create-invalidation --distribution-id "${CLOUDFRONT_DISTRIBUTION_ID}" --paths '/*'
+        run: |
+          INVALIDATION_ID=$(aws cloudfront create-invalidation --distribution-id "${CLOUDFRONT_DISTRIBUTION_ID}" --paths '/*' --query 'Invalidation.Id' --output text)
+          aws cloudfront wait invalidation-completed --distribution-id "${CLOUDFRONT_DISTRIBUTION_ID}" --id "$INVALIDATION_ID"
+
+      - name: Smoke test preview
+        if: github.event.action != 'closed'
+        env:
+          PREVIEW_URL: ${{ steps.deploy.outputs.preview-url }}
+        run: npm run test:smoke -- "$PREVIEW_URL"
 
       - name: Comment preview URL
         if: github.event.action != 'closed'
@@ -102,7 +122,9 @@ jobs:
         run: |
           terraform init
           if terraform workspace select "pr-${PR_NUMBER}"; then
-            terraform destroy -auto-approve -var="pr_number=${PR_NUMBER}"
+            S3_BUCKET=$(terraform output -raw s3_bucket_name)
+            bash ../scripts/empty-versioned-preview-bucket.sh "$S3_BUCKET" "$PR_NUMBER"
+            terraform destroy -auto-approve -var="deploy_artifacts=false"
             terraform workspace select default
             terraform workspace delete "pr-${PR_NUMBER}"
           else

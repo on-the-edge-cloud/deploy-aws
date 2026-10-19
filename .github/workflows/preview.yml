@@ -11,6 +11,7 @@ permissions:
 
 env:
   AWS_REGION: eu-north-1
+  AWS_ROLE_ARN: arn:aws:iam::191926569765:role/github-actions-nextjs-preview
 
 concurrency:
   group: preview-pr-${{ github.event.pull_request.number }}

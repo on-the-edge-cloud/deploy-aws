@@ -2,6 +2,12 @@
 
 # dependencies
 /node_modules
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+.env
+.env.local
 /.pnp
 .pnp.js
 
@@ -11,6 +17,7 @@
 # next.js
 /.next/
 /out/
+/.open-next/
 
 # production
 /build

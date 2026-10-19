@@ -1,0 +1,15 @@
+app:
+  workspace-prefix: ""
+  directory: "."
+  node-version: "22"
+  install-command: "npm ci"
+  lint-command: "npm run lint"
+  test-command: ""
+  build-command: ""
+  opennext-build-command: "npm run opennext:build"
+  smoke-test-command: 'npm run test:smoke -- "$PREVIEW_URL"'
+
+preview:
+  deployment-type: "ssr"
+  aws-region: "eu-north-1"
+  terraform-module-version: "v1.3.0"

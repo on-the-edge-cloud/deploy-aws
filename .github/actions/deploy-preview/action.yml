@@ -69,7 +69,6 @@ runs:
         terraform -chdir="$terraform_root" fmt -check -recursive
         terraform -chdir="$terraform_root" init -backend=false -input=false
         terraform -chdir="$terraform_root" validate
-        terraform -chdir="$terraform_root" test
         terraform -chdir="$terraform_root" init -reconfigure -input=false
 
         terraform -chdir="$terraform_root" workspace select "$workspace" \

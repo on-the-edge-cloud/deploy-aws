@@ -1,0 +1,57 @@
+name: Platform infrastructure tests
+
+on:
+  pull_request:
+    paths:
+      - ".github/actions/**"
+      - ".github/workflows/platform-test.yml"
+      - "infra/**"
+      - "next.config.ts"
+      - "open-next.config.ts"
+      - "package.json"
+      - "package-lock.json"
+      - "src/**"
+  push:
+    branches: [main]
+    paths:
+      - ".github/actions/**"
+      - ".github/workflows/platform-test.yml"
+      - "infra/**"
+      - "next.config.ts"
+      - "open-next.config.ts"
+      - "package.json"
+      - "package-lock.json"
+      - "src/**"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Build OpenNext test artifacts
+        run: |
+          npm ci
+          npm run lint
+          npm run opennext:build
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.5
+
+      - name: Test Terraform module
+        run: |
+          terraform -chdir=infra fmt -check -recursive
+          terraform -chdir=infra init -backend=false -input=false
+          terraform -chdir=infra validate
+          terraform -chdir=infra test

@@ -174,6 +174,87 @@ h1 span {
   background: #bbc7b6;
 }
 
+.demos {
+  margin-top: 34px;
+}
+
+.demos-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.demos-heading h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.demo-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.demo-link {
+  min-width: 0;
+  min-height: 148px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: rgb(255 255 255 / 52%);
+  transition: background-color 160ms ease, border-color 160ms ease;
+}
+
+.demo-link:hover {
+  border-color: #9aa997;
+  background: rgb(255 255 255 / 88%);
+}
+
+.demo-link:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 3px;
+}
+
+.demo-meta {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 17px;
+  font-family: "DM Mono", monospace;
+  font-size: 10px;
+}
+
+.demo-kind {
+  color: var(--green);
+  font-weight: 500;
+}
+
+.demo-meta code {
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font: inherit;
+}
+
+.demo-link strong {
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.demo-description {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
 .footer {
   min-height: 58px;
   display: flex;
@@ -257,6 +338,24 @@ h1 span {
 
   .connector {
     margin: 12px 8px 0;
+  }
+
+  .demos-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .demo-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .demo-link {
+    min-height: 0;
+  }
+
+  .demo-meta {
+    margin-bottom: 12px;
   }
 
   .footer {

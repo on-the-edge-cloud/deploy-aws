@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   production:
-    uses: on-the-edge-cloud/github-actions-nextjs/.github/workflows/nextjs-production.yml@v1.6
+    uses: on-the-edge-cloud/github-actions-nextjs/.github/workflows/nextjs-production.yml@v1.7
     with:
       config-path: nextjs-app.yml
     secrets: inherit

@@ -12,8 +12,8 @@ permissions:
 jobs:
   preview:
     if: github.event.pull_request.head.repo.full_name == github.repository
-    uses: on-the-edge-cloud/github-actions-nextjs/.github/workflows/nextjs-preview.yml@v1.9
+    uses: on-the-edge-cloud/github-actions-nextjs/.github/workflows/nextjs-preview.yml@v1.10
     with:
-      config-path: nextjs-app.yml
+      aws-region: "eu-north-1"
       command: ${{ github.event.action == 'closed' && 'destroy' || 'deploy' }}
     secrets: inherit

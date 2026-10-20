@@ -13,12 +13,11 @@ Rutas de muestra: `/ssr/` renderiza dinámicamente, `/api/health/` verifica una 
 
 ```sh
 npm run lint
-npm run opennext:build
+npm run build
 npm run start
-npm run test:smoke -- http://localhost:3000
 ```
 
-OpenNext ejecuta `next build` y genera `.open-next/`; el pipeline publica ese artefacto con el módulo Terraform indicado en [nextjs-app.yml](nextjs-app.yml).
+El build de producción usa `next build`. La configuración de preview está en [nextjs-app.yml](nextjs-app.yml) y se ejecuta mediante el workflow reutilizable.
 
 ## Preview
 

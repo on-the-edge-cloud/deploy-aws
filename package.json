@@ -5,10 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "opennext:build": "open-next build",
     "start": "next start",
-    "lint": "tsc --noEmit",
-    "test:smoke": "node scripts/smoke-test.mjs"
+    "lint": "tsc --noEmit"
   },
   "dependencies": {
     "next": "^15.5.0",
@@ -22,7 +20,6 @@
     }
   },
   "devDependencies": {
-    "@opennextjs/aws": "4.1.11",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

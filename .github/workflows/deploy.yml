@@ -1,0 +1,17 @@
+name: Production environment
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  production:
+    uses: on-the-edge-cloud/github-actions-nextjs/.github/workflows/nextjs-production.yml@v1.5
+    with:
+      config-path: nextjs-app.yml
+    secrets: inherit
